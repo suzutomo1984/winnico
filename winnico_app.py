@@ -20,11 +20,6 @@ try:
 except ImportError:
     HAS_WIN32 = False
 
-try:
-    import keyboard
-    HAS_KEYBOARD = True
-except ImportError:
-    HAS_KEYBOARD = False
 
 try:
     import yaml
@@ -657,21 +652,6 @@ def main():
 
     t = threading.Thread(target=run_socket_server, args=(nico,), daemon=True)
     t.start()
-
-    # Ctrl を 0.5秒以内に2回押すとAntigravityフォーカス
-    if HAS_KEYBOARD:
-        _last_ctrl_time = [0.0]
-
-        def _on_ctrl():
-            now = time.time()
-            if now - _last_ctrl_time[0] < 0.5:
-                bridge.focus_requested.emit()  # Qtメインスレッド経由で呼ぶ
-                _last_ctrl_time[0] = 0.0
-            else:
-                _last_ctrl_time[0] = now
-
-        keyboard.add_hotkey("ctrl", _on_ctrl, suppress=False)
-        print("[WinClaude] ホットキー Ctrl×2 登録済み")
 
     print("[WinClaude] 起動しました。Claude Code の承認を待機中...")
     sys.exit(app.exec_())
