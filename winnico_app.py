@@ -559,15 +559,16 @@ class NicoWindow(QWidget):
             win32gui.SetForegroundWindow(hwnd)
             time.sleep(0.1)
 
-            # チャット入力欄をクリックしてカーソルを確実に入れる
+            # チャット入力欄にフォーカスを送る（マウスカーソルは動かさない）
             rect = win32gui.GetWindowRect(hwnd)
             win_left, win_top, win_right, win_bottom = rect
             click_x = (win_left + win_right) // 2
             click_y = win_bottom - offset_bottom
-            win32api.SetCursorPos((click_x, click_y))
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, click_x, click_y, 0, 0)
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, click_x, click_y, 0, 0)
-            print(f"[WinNico] フォーカス試行: {found[0][1]} → クリック({click_x}, {click_y})")
+            # ウィンドウ座標に変換してSendMessageでクリックイベントを送信
+            lParam = (click_y - win_top) << 16 | (click_x - win_left)
+            win32gui.SendMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
+            win32gui.SendMessage(hwnd, win32con.WM_LBUTTONUP, 0, lParam)
+            print(f"[WinNico] フォーカス試行: {found[0][1]} → SendMessage({click_x}, {click_y})")
         except Exception as e:
             print(f"[WinNico] フォーカス失敗: {e}")
 
