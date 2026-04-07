@@ -1,123 +1,8 @@
 # WinNico 🍊
 
-**Claude Code for Windows** — A desktop companion that sits on your screen and handles tool approval requests from Claude Code.
-
-[日本語](#日本語) | [English](#english)
+Claude Code for Windows — 画面上に常駐するキャラクターがClaude Codeの承認リクエストを通知してくれるアプリ。
 
 ---
-
-## English
-
-### What is WinNico?
-
-WinNico is a small always-on-top companion window for **Claude Code on Windows**.
-
-When Claude Code wants to run a potentially dangerous command (like `rm`, `git push`, `curl`, etc.), WinNico pops up and asks for your approval — so you stay in control without having to babysit the terminal.
-
-**Features:**
-- 🍊 Animated character lives on your screen
-- ✅ Approve / ❌ Deny individual tool requests
-- ✅✅ **Bulk approve** — approve all future `curl` requests (or any keyword type) for the rest of the session
-- 🔔 Notifications for non-dangerous tools (WebSearch, WebFetch)
-- 🖱️ Click the character to focus Claude Code's window
-- 🔧 One-command setup
-
-### Requirements
-
-- Windows 10/11
-- Python 3.10+
-- [Claude Code](https://claude.ai/code) installed
-
-### Installation
-
-> [!WARNING]
-> **WinNico must be running before you use Claude Code.**
-> If `winnico_app.py` is not running, dangerous commands will be **blocked** (not silently allowed).
-> Always start WinNico first, then start Claude Code.
-
-```bash
-# 1. Clone this repository
-git clone https://github.com/suzutomo1984/winnico.git
-cd winnico
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Register Claude Code hooks (run once)
-python setup_hooks.py
-
-# 4. Start WinNico (keep this running in the background)
-python winnico_app.py
-
-# 5. In another terminal, start Claude Code with bypass mode
-claude --permission-mode bypassPermissions
-```
-
-That's it! WinNico will now intercept Claude Code's tool requests.
-
-> [!IMPORTANT]
-> **You must use `--permission-mode bypassPermissions`** when starting Claude Code.
-> Without this flag, Claude Code shows its own approval UI first — WinNico won't get a chance to intercept.
-> In bypass mode, Claude Code skips its built-in approval UI and delegates all decisions to WinNico.
-
-### Uninstall
-
-```bash
-# Remove hooks from Claude Code settings
-python setup_hooks.py --remove
-```
-
-### Which commands require approval?
-
-By default, WinNico asks for approval on these Bash commands:
-
-| Command | Reason |
-|---------|--------|
-| `rm` / `rmdir` | File deletion |
-| `git push` | Remote push |
-| `git reset` | History rewrite |
-| `git clean` | Untracked file deletion |
-| `pip install/uninstall` | Package changes |
-| `npm install/uninstall` | Package changes |
-| `curl` / `wget` | External downloads |
-| `powershell` | PowerShell execution |
-| `shutdown` / `reboot` | System commands |
-| `format` / `mkfs` | Disk operations |
-| SQL: `drop` / `delete` / `truncate` | Database operations |
-
-All other commands (Read, Grep, Glob, Edit, Write, etc.) pass through silently.
-
-To customize, edit `DANGEROUS_BASH_KEYWORDS` in `hook_handler.py`.
-
-### Bulk Approve
-
-During a session with lots of similar requests (e.g., Claude running multiple `curl` commands), click **✅✅ Approve all `curl` requests** to auto-approve that command type for the rest of the session.
-
-The auto-approve list resets when you restart WinNico.
-
-### Customizing the Character and Target Window
-
-Copy `config.default.yaml` to `config.yaml` and edit:
-
-```yaml
-# Path to character image (relative to winnico folder, or absolute path)
-character_image: "my_character.png"
-
-# Window title keywords to focus on click (partial match, case-insensitive)
-target_window_titles:
-  - "Cursor"          # for Cursor users
-  # - "Visual Studio Code"
-  # - "Antigravity"
-
-# Distance from bottom of window to click (px) — adjust for your editor's chat input
-chat_input_offset_from_bottom: 60
-```
-
-`config.yaml` is gitignored — your personal settings won't be committed.
-
----
-
-## 日本語
 
 ### WinNicoとは？
 
@@ -131,7 +16,6 @@ Claude Codeが危険なコマンド（`rm`、`git push`、`curl` 等）を実行
 - ✅✅ **まとめて許可** — `curl` 系など同じ種別のコマンドをセッション中ずっと自動許可
 - 🔔 無害なツール（WebSearch等）は通知のみ
 - 🖱️ キャラをクリックでClaude Codeウィンドウにフォーカス
-- 🔧 セットアップは1コマンド
 
 ### 必要環境
 
@@ -144,7 +28,6 @@ Claude Codeが危険なコマンド（`rm`、`git push`、`curl` 等）を実行
 > [!WARNING]
 > **WinNicoは必ずClaude Codeより先に起動してください。**
 > `winnico_app.py` が起動していない場合、危険なコマンドは**ブロックされます**（黙って許可はされません）。
-> 必ずWinNicoを先に起動してからClaude Codeを使ってください。
 
 ```bash
 # 1. クローン
@@ -163,8 +46,6 @@ python winnico_app.py
 # 5. 別のターミナルでClaude Codeをbypassモードで起動
 claude --permission-mode bypassPermissions
 ```
-
-以降はClaude Codeを使うたびに、WinNicoが承認をインターセプトします。
 
 > [!IMPORTANT]
 > **`--permission-mode bypassPermissions` を必ず付けて起動してください。**
@@ -201,6 +82,10 @@ target_window_titles:
 
 # チャット入力欄のクリック位置（ウィンドウ下端からの距離 px）
 chat_input_offset_from_bottom: 60
+
+# マウスカーソルを動かしてクリックする方式（デフォルト: false）
+# Electron系エディタ（Cursor, VSCode等）でフォーカスが効かない場合は true にする
+use_cursor_pos: false
 ```
 
 `config.yaml` は `.gitignore` 対象なので個人設定が誤ってpushされません。
@@ -231,17 +116,22 @@ python setup_hooks.py
 
 ### Step 3: config.yaml の作成（必須）
 
-ユーザーに以下を確認してから `config.yaml` を作成する：
+ユーザーに以下を一問一答で確認してから `config.yaml` を作成する：
 
 1. **使用エディタ・ターミナルは？**
    例: Antigravity / Cursor / Visual Studio Code / Windows Terminal など
    → タイトルバーに表示される文字列を `target_window_titles` に設定する
 
-2. **フォーカス方式は？**
+2. **キャラクター画像はどうする？**
+   - デフォルト（付属の `character.png`）をそのまま使う
+   - 自分で用意した画像に差し替える（PNG推奨・透過対応）
+   → 差し替える場合は画像ファイルのパスを `character_image` に設定する
+
+3. **フォーカス方式は？**
    - `use_cursor_pos: false`（デフォルト・カーソルが動かない）
    - `use_cursor_pos: true`（Cursor/VSCodeなどElectron系でフォーカスが効かない場合）
 
-3. **チャット入力欄の位置はデフォルト（60px）でよいか？**
+4. **チャット入力欄の位置はデフォルト（60px）でよいか？**
    ずれる場合は `chat_input_offset_from_bottom` を調整する。
 
 ### Step 4: 起動案内
