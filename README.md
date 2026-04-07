@@ -207,6 +207,55 @@ chat_input_offset_from_bottom: 60
 
 ---
 
+## For Claude Code
+
+このリポジトリをClone後、Claude Codeに読ませると対話形式でセットアップを進めることができます。
+
+**Claude Codeへの指示:** 以下の手順でユーザーに一問一答しながらセットアップを進めてください。
+
+### Step 1: 依存パッケージの確認・インストール
+
+```bash
+pip show PyQt5 pywin32 pyyaml
+```
+
+未インストールのものがあれば `pip install -r requirements.txt` を実行する。
+
+### Step 2: フックの登録
+
+既存の `~/.claude/settings.json` の設定は保持されることをユーザーに伝えてから実行する。
+
+```bash
+python setup_hooks.py
+```
+
+### Step 3: config.yaml の作成（必須）
+
+ユーザーに以下を確認してから `config.yaml` を作成する：
+
+1. **使用エディタ・ターミナルは？**
+   例: Antigravity / Cursor / Visual Studio Code / Windows Terminal など
+   → タイトルバーに表示される文字列を `target_window_titles` に設定する
+
+2. **フォーカス方式は？**
+   - `use_cursor_pos: false`（デフォルト・カーソルが動かない）
+   - `use_cursor_pos: true`（Cursor/VSCodeなどElectron系でフォーカスが効かない場合）
+
+3. **チャット入力欄の位置はデフォルト（60px）でよいか？**
+   ずれる場合は `chat_input_offset_from_bottom` を調整する。
+
+### Step 4: 起動案内
+
+```bash
+# ターミナル1: WinNicoを起動したままにする
+python winnico_app.py
+
+# ターミナル2: Claude Codeをbypassモードで起動（必須）
+claude --permission-mode bypassPermissions
+```
+
+---
+
 ## License
 
 MIT
