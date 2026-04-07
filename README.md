@@ -20,7 +20,6 @@ When Claude Code wants to run a potentially dangerous command (like `rm`, `git p
 - ✅✅ **Bulk approve** — approve all future `curl` requests (or any keyword type) for the rest of the session
 - 🔔 Notifications for non-dangerous tools (WebSearch, WebFetch)
 - 🖱️ Click the character to focus Claude Code's window
-- ⌨️ Double-tap `Ctrl` hotkey to focus Claude Code's window
 - 🔧 One-command setup
 
 ### Requirements
@@ -83,9 +82,25 @@ During a session with lots of similar requests (e.g., Claude running multiple `c
 
 The auto-approve list resets when you restart WinNico.
 
-### Customizing the Character
+### Customizing the Character and Target Window
 
-Replace `character.png` with any 80×80 PNG (transparent background recommended).
+Copy `config.default.yaml` to `config.yaml` and edit:
+
+```yaml
+# Path to character image (relative to winnico folder, or absolute path)
+character_image: "my_character.png"
+
+# Window title keywords to focus on click (partial match, case-insensitive)
+target_window_titles:
+  - "Cursor"          # for Cursor users
+  # - "Visual Studio Code"
+  # - "Antigravity"
+
+# Distance from bottom of window to click (px) — adjust for your editor's chat input
+chat_input_offset_from_bottom: 60
+```
+
+`config.yaml` is gitignored — your personal settings won't be committed.
 
 ---
 
@@ -103,7 +118,6 @@ Claude Codeが危険なコマンド（`rm`、`git push`、`curl` 等）を実行
 - ✅✅ **まとめて許可** — `curl` 系など同じ種別のコマンドをセッション中ずっと自動許可
 - 🔔 無害なツール（WebSearch等）は通知のみ
 - 🖱️ キャラをクリックでClaude Codeウィンドウにフォーカス
-- ⌨️ `Ctrl` 2回押しでClaude Codeにフォーカス
 - 🔧 セットアップは1コマンド
 
 ### 必要環境
@@ -145,9 +159,25 @@ python setup_hooks.py --remove
 
 調査系タスクなど `curl` が何度も走るシーンでは、**✅✅ curl系は全部許可** ボタンを押せばそのセッション中は同種コマンドを自動で許可します。WinNicoを再起動するとリセットされます。
 
-### キャラクター変更
+### キャラクター・ウィンドウ設定の変更
 
-`character.png`（推奨: 80×80px・透過PNG）を差し替えるだけです。
+`config.default.yaml` を `config.yaml` にコピーして編集するだけ：
+
+```yaml
+# キャラ画像（winnicoフォルダからの相対パス、または絶対パス）
+character_image: "my_character.png"
+
+# フォーカス対象ウィンドウのタイトルキーワード（部分一致・大文字小文字無視）
+target_window_titles:
+  - "Cursor"          # Cursorユーザーはここを変える
+  # - "Visual Studio Code"
+  # - "Antigravity"
+
+# チャット入力欄のクリック位置（ウィンドウ下端からの距離 px）
+chat_input_offset_from_bottom: 60
+```
+
+`config.yaml` は `.gitignore` 対象なので個人設定が誤ってpushされません。
 
 ---
 
