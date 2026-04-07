@@ -1,3 +1,4 @@
 PyQt5>=5.15.0
 pywin32>=306
 keyboard>=0.13.5
+pyyaml>=6.0

@@ -1,0 +1,15 @@
+# WinNico デフォルト設定
+# このファイルをコピーして config.yaml を作り、自分用にカスタマイズしてください
+# cp config.default.yaml config.yaml
+
+# キャラクター画像のパス（winnico フォルダからの相対パス、または絶対パス）
+character_image: "character.png"
+
+# フォーカス対象ウィンドウのタイトルキーワード（部分一致、大文字小文字無視）
+# 複数指定した場合は上から順に探して最初にヒットしたウィンドウをフォーカスする
+target_window_titles:
+  - "Antigravity"
+
+# チャット入力欄のクリック位置（ウィンドウ下端からの距離 px）
+# エディタによって調整が必要な場合は変更する
+chat_input_offset_from_bottom: 60

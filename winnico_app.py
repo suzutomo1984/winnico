@@ -26,6 +26,12 @@ try:
 except ImportError:
     HAS_KEYBOARD = False
 
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
 from PyQt5.QtWidgets import (QApplication, QWidget, QPushButton,
                               QSystemTrayIcon, QMenu, QAction, QTextEdit, QScrollArea)
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject, QRect, QPoint, QRectF
@@ -34,6 +40,37 @@ from PyQt5.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPainterPath,
 
 # TCP ポート (hook_handler.py と合わせること)
 SOCKET_PORT = 19234
+
+# ============================================================
+# 設定ローダー
+# ============================================================
+_BASE_DIR = Path(__file__).parent
+
+def _load_config() -> dict:
+    """config.yaml → config.default.yaml の順で読み込む。yamlが使えない場合はデフォルト値を返す。"""
+    defaults = {
+        "character_image": "character.png",
+        "target_window_titles": ["Antigravity"],
+        "chat_input_offset_from_bottom": 60,
+    }
+    if not HAS_YAML:
+        return defaults
+
+    for fname in ("config.yaml", "config.default.yaml"):
+        cfg_path = _BASE_DIR / fname
+        if cfg_path.exists():
+            try:
+                with open(cfg_path, encoding="utf-8") as f:
+                    data = yaml.safe_load(f) or {}
+                # デフォルト値で補完
+                for k, v in defaults.items():
+                    data.setdefault(k, v)
+                return data
+            except Exception as e:
+                print(f"[WinNico] 設定ファイル読み込みエラー ({fname}): {e}")
+    return defaults
+
+CONFIG = _load_config()
 
 # ============================================================
 # スレッド間通信用シグナルブリッジ
@@ -78,8 +115,12 @@ class NicoWindow(QWidget):
         self._drag_offset     = QPoint()
         self._current_danger_kw: str = ""  # 現在の承認リクエストのキーワード種別
 
-        # キャラ画像ロード（透過PNG対応）
-        img_path = Path(__file__).parent / "character.png"
+        # キャラ画像ロード（透過PNG対応・config.yamlで差し替え可能）
+        img_setting = CONFIG.get("character_image", "character.png")
+        img_path = Path(img_setting) if Path(img_setting).is_absolute() else _BASE_DIR / img_setting
+        if not img_path.exists():
+            print(f"[WinNico] キャラ画像が見つかりません: {img_path}、デフォルトにフォールバック")
+            img_path = _BASE_DIR / "character.png"
         self._char_pixmap = QPixmap(str(img_path)).scaled(
             80, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
@@ -485,18 +526,18 @@ class NicoWindow(QWidget):
             self.move(e.globalPos() - self._drag_offset)
 
     def _focus_claude_window(self):
-        """Claude Code が動いてるターミナルウィンドウをフォーカスする"""
+        """設定ファイルで指定されたウィンドウをフォーカスする"""
         if not HAS_WIN32:
             return
 
-        # 対象ウィンドウのタイトルキーワード（Antigravity優先、ブラウザタブを除外）
-        TARGET_TITLES = ["Antigravity"]
+        target_titles = CONFIG.get("target_window_titles", ["Antigravity"])
+        offset_bottom = CONFIG.get("chat_input_offset_from_bottom", 60)
 
         def enum_handler(hwnd, results):
             if not win32gui.IsWindowVisible(hwnd):
                 return
             title = win32gui.GetWindowText(hwnd).lower()
-            for t in TARGET_TITLES:
+            for t in target_titles:
                 if t.lower() in title:
                     results.append((hwnd, win32gui.GetWindowText(hwnd)))
 
@@ -514,7 +555,7 @@ class NicoWindow(QWidget):
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
                 time.sleep(0.05)
 
-            # WINNICOを先にアクティブにしてからAntigravityへ（クリック時はWINNICOがフォアグラウンド）
+            # WINNICOを先にアクティブにしてから対象ウィンドウへ（クリック時はWINNICOがフォアグラウンド）
             my_hwnd = int(self.winId())
             win32gui.SetForegroundWindow(my_hwnd)
             time.sleep(0.05)
@@ -523,11 +564,10 @@ class NicoWindow(QWidget):
             time.sleep(0.1)
 
             # チャット入力欄をクリックしてカーソルを確実に入れる
-            # Antigravityのウィンドウ矩形を取得して下部中央をクリック
             rect = win32gui.GetWindowRect(hwnd)
             win_left, win_top, win_right, win_bottom = rect
             click_x = (win_left + win_right) // 2
-            click_y = win_bottom - 60  # 下端から60px上（チャット入力欄）
+            click_y = win_bottom - offset_bottom
             win32api.SetCursorPos((click_x, click_y))
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, click_x, click_y, 0, 0)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, click_x, click_y, 0, 0)
