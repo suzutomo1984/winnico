@@ -49,11 +49,16 @@ python setup_hooks.py
 # 4. Start WinNico (keep this running in the background)
 python winnico_app.py
 
-# 5. In another terminal, start Claude Code
-claude
+# 5. In another terminal, start Claude Code with bypass mode
+claude --permission-mode bypassPermissions
 ```
 
 That's it! WinNico will now intercept Claude Code's tool requests.
+
+> [!IMPORTANT]
+> **You must use `--permission-mode bypassPermissions`** when starting Claude Code.
+> Without this flag, Claude Code shows its own approval UI first — WinNico won't get a chance to intercept.
+> In bypass mode, Claude Code skips its built-in approval UI and delegates all decisions to WinNico.
 
 ### Uninstall
 
@@ -155,11 +160,16 @@ python setup_hooks.py
 # 4. WinNico を起動（バックグラウンドで起動したままにする）
 python winnico_app.py
 
-# 5. 別のターミナルでClaude Codeを起動
-claude
+# 5. 別のターミナルでClaude Codeをbypassモードで起動
+claude --permission-mode bypassPermissions
 ```
 
 以降はClaude Codeを使うたびに、WinNicoが承認をインターセプトします。
+
+> [!IMPORTANT]
+> **`--permission-mode bypassPermissions` を必ず付けて起動してください。**
+> このフラグなしで起動すると、Claude Code自身の承認UIが先に表示されWinNicoが機能しません。
+> bypassモードにすることで、Claude CodeはUIを出さずにWinNicoにすべての承認を委譲します。
 
 ### アンインストール
 
