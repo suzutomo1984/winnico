@@ -16,3 +16,9 @@ target_window_titles:
 # チャット入力欄のクリック位置（ウィンドウ下端からの距離 px）
 # エディタによって調整が必要な場合は変更する
 chat_input_offset_from_bottom: 60
+
+# マウスカーソルを動かしてクリックする方式（デフォルト: false）
+# false: SendMessage でクリックイベントを送信（カーソルが動かない）
+# true:  SetCursorPos + mouse_event で物理クリック（カーソルが動く）
+# Electron系エディタ（Cursor, VSCode等）でフォーカスが効かない場合は true にする
+use_cursor_pos: false

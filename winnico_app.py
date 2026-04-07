@@ -48,6 +48,7 @@ def _load_config() -> dict:
         "character_image": "character.png",
         "target_window_titles": ["Claude", "Terminal"],
         "chat_input_offset_from_bottom": 60,
+        "use_cursor_pos": False,
     }
     if not HAS_YAML:
         return defaults
@@ -526,8 +527,9 @@ class NicoWindow(QWidget):
         if not HAS_WIN32:
             return
 
-        target_titles = CONFIG.get("target_window_titles", ["Antigravity"])
-        offset_bottom = CONFIG.get("chat_input_offset_from_bottom", 60)
+        target_titles  = CONFIG.get("target_window_titles", ["Antigravity"])
+        offset_bottom  = CONFIG.get("chat_input_offset_from_bottom", 60)
+        use_cursor_pos = CONFIG.get("use_cursor_pos", False)
 
         def enum_handler(hwnd, results):
             if not win32gui.IsWindowVisible(hwnd):
@@ -559,16 +561,24 @@ class NicoWindow(QWidget):
             win32gui.SetForegroundWindow(hwnd)
             time.sleep(0.1)
 
-            # チャット入力欄にフォーカスを送る（マウスカーソルは動かさない）
+            # チャット入力欄にフォーカスを送る
             rect = win32gui.GetWindowRect(hwnd)
             win_left, win_top, win_right, win_bottom = rect
             click_x = (win_left + win_right) // 2
             click_y = win_bottom - offset_bottom
-            # ウィンドウ座標に変換してSendMessageでクリックイベントを送信
-            lParam = (click_y - win_top) << 16 | (click_x - win_left)
-            win32gui.SendMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
-            win32gui.SendMessage(hwnd, win32con.WM_LBUTTONUP, 0, lParam)
-            print(f"[WinNico] フォーカス試行: {found[0][1]} → SendMessage({click_x}, {click_y})")
+            if use_cursor_pos:
+                # SetCursorPos方式: 物理クリック（カーソルが動く）
+                # Electron系エディタ（Cursor, VSCode等）でSendMessageが効かない場合に使用
+                win32api.SetCursorPos((click_x, click_y))
+                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, click_x, click_y, 0, 0)
+                win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, click_x, click_y, 0, 0)
+                print(f"[WinNico] フォーカス試行: {found[0][1]} → SetCursorPos({click_x}, {click_y})")
+            else:
+                # SendMessage方式: カーソルが動かない（デフォルト）
+                lParam = (click_y - win_top) << 16 | (click_x - win_left)
+                win32gui.SendMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lParam)
+                win32gui.SendMessage(hwnd, win32con.WM_LBUTTONUP, 0, lParam)
+                print(f"[WinNico] フォーカス試行: {found[0][1]} → SendMessage({click_x}, {click_y})")
         except Exception as e:
             print(f"[WinNico] フォーカス失敗: {e}")
 
