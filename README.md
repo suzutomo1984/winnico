@@ -123,9 +123,9 @@ python setup_hooks.py
    → タイトルバーに表示される文字列を `target_window_titles` に設定する
 
 2. **キャラクター画像はどうする？**
-   - デフォルト（付属の `character.png`）をそのまま使う
-   - 自分で用意した画像に差し替える（PNG推奨・透過対応）
-   → 差し替える場合は画像ファイルのパスを `character_image` に設定する
+   `character.png` はリポジトリに付属しているのでcloneすればそのまま使える。
+   - デフォルト（付属の `character.png`）をそのまま使う → 設定変更不要
+   - 好きな画像に差し替えたい → PNG推奨・透過対応。画像ファイルのパスを `character_image` に設定する
 
 3. **フォーカス方式は？**
    - `use_cursor_pos: false`（デフォルト・カーソルが動かない）
