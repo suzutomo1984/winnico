@@ -71,11 +71,14 @@ def send_to_winnico(payload: dict) -> dict:
         sock.close()
         return json.loads(raw.decode())
     except (ConnectionRefusedError, socket.timeout):
-        # WinNico が起動していない場合はデフォルト許可
-        return {"behavior": "allow"}
+        sys.stderr.write(
+            f"[WinNico hook] 警告: WinNicoサーバーに接続できません (127.0.0.1:{SOCKET_PORT})\n"
+            "コマンドをブロックします。先にwinnico_app.pyを起動してください。\n"
+        )
+        return {"behavior": "block", "reason": "WinNicoが起動していません。winnico_app.pyを先に起動してください。"}
     except Exception as e:
         sys.stderr.write(f"[WinNico hook] エラー: {e}\n")
-        return {"behavior": "allow"}
+        return {"behavior": "block", "reason": "WinNicoフックでエラーが発生しました。"}
 
 
 def main():
@@ -85,7 +88,9 @@ def main():
     try:
         hook_data = json.loads(raw_input)
     except json.JSONDecodeError:
-        # パースできなければ許可
+        # パースできなければブロック（fail-safe）
+        result = {"decision": "block", "reason": "WinNicoフック: 入力JSONのパースに失敗しました。"}
+        print(json.dumps(result, ensure_ascii=False))
         sys.exit(0)
 
     tool_name  = hook_data.get("tool_name", "")
@@ -127,19 +132,19 @@ def main():
         "danger_kw":  danger_kw,
     })
 
-    behavior = response.get("behavior", "allow")
+    behavior = response.get("behavior")
 
-    if behavior == "block":
-        reason = response.get("reason", "ユーザーが拒否しました")
-        # Claude Code に block を返す（stdout に JSON + 改行）
-        result = {
-            "decision": "block",
-            "reason":   reason,
-        }
-        print(json.dumps(result, ensure_ascii=False))
+    if behavior == "allow":
+        # 明示的なallowのみ通過
         sys.exit(0)
 
-    # allow の場合は何も出力せず exit 0
+    # allow 以外（block・None・不明）はすべてブロック
+    reason = response.get("reason", "WinNicoが明示的なallowを返しませんでした。")
+    result = {
+        "decision": "block",
+        "reason":   reason,
+    }
+    print(json.dumps(result, ensure_ascii=False))
     sys.exit(0)
 
 

@@ -11,6 +11,7 @@ import socket
 import json
 import time
 import math
+import traceback
 from pathlib import Path
 try:
     import win32gui
@@ -45,7 +46,7 @@ def _load_config() -> dict:
     """config.yaml → config.default.yaml の順で読み込む。yamlが使えない場合はデフォルト値を返す。"""
     defaults = {
         "character_image": "character.png",
-        "target_window_titles": ["Antigravity"],
+        "target_window_titles": ["Claude", "Terminal"],
         "chat_input_offset_from_bottom": 60,
     }
     if not HAS_YAML:
@@ -574,15 +575,16 @@ class NicoWindow(QWidget):
 # ============================================================
 # ソケットサーバー
 # ============================================================
-def run_socket_server(nico):
+def _create_socket_server() -> socket.socket:
+    """ソケットサーバーを生成してバインドする。失敗時はOSErrorを送出する。"""
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    try:
-        srv.bind(("127.0.0.1", SOCKET_PORT))
-    except OSError as e:
-        print(f"[WinClaude] ポート {SOCKET_PORT} をバインドできません: {e}")
-        return
+    srv.bind(("127.0.0.1", SOCKET_PORT))  # ポート使用中なら OSError
     srv.listen(5)
+    return srv
+
+
+def run_socket_server(srv: socket.socket, nico):
     print(f"[WinClaude] ソケットサーバー起動 ポート {SOCKET_PORT}")
     while True:
         try:
@@ -631,9 +633,13 @@ def _handle_connection(conn, nico):
         conn.sendall((json.dumps(resp, ensure_ascii=False) + "\n").encode())
 
     except Exception as e:
-        print(f"[WinClaude] エラー: {e}")
+        print(f"[WinClaude] エラー:\n{traceback.format_exc()}")
         try:
-            conn.sendall(b'{"behavior":"allow"}\n')
+            err_resp = json.dumps(
+                {"behavior": "block", "reason": "WinNicoサーバーでエラーが発生しました。"},
+                ensure_ascii=False
+            ) + "\n"
+            conn.sendall(err_resp.encode())
         except Exception:
             pass
     finally:
@@ -650,7 +656,14 @@ def main():
     nico = NicoWindow()
     nico.show()
 
-    t = threading.Thread(target=run_socket_server, args=(nico,), daemon=True)
+    try:
+        srv = _create_socket_server()
+    except OSError as e:
+        print(f"[WinClaude] 致命的エラー: ポート {SOCKET_PORT} をバインドできません: {e}")
+        print("別のWinNicoが起動中か、ポートが使用中の可能性があります。")
+        sys.exit(1)
+
+    t = threading.Thread(target=run_socket_server, args=(srv, nico), daemon=True)
     t.start()
 
     print("[WinClaude] 起動しました。Claude Code の承認を待機中...")

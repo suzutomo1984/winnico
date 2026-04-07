@@ -10,7 +10,20 @@ import json
 import os
 import sys
 import shutil
+import tempfile
 from pathlib import Path
+
+
+def _write_json_atomic(path: Path, data: dict) -> None:
+    """JSON をアトミックに書き込む（クラッシュ時に既存ファイルを壊さない）"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=str(path.parent), delete=False, suffix=".tmp"
+    ) as tmp:
+        json.dump(data, tmp, ensure_ascii=False, indent=2)
+        tmp.flush()
+        temp_name = tmp.name
+    os.replace(temp_name, path)
 
 
 def get_claude_settings_path() -> Path:
@@ -109,9 +122,8 @@ def setup():
     }
     hooks["Stop"].append(stop_hook)
 
-    # 書き込み
-    with open(settings_path, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=2)
+    # 書き込み（アトミック：クラッシュ時に既存設定を壊さない）
+    _write_json_atomic(settings_path, settings)
 
     print("  ✅ フック登録完了！")
     print()
@@ -140,8 +152,7 @@ def remove():
     ]
     hooks["PreToolUse"] = filtered
 
-    with open(settings_path, "w", encoding="utf-8") as f:
-        json.dump(settings, f, ensure_ascii=False, indent=2)
+    _write_json_atomic(settings_path, settings)
 
     print("✅ WinNico フックを削除しました。")
 

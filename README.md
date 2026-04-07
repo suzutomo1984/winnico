@@ -30,6 +30,11 @@ When Claude Code wants to run a potentially dangerous command (like `rm`, `git p
 
 ### Installation
 
+> [!WARNING]
+> **WinNico must be running before you use Claude Code.**
+> If `winnico_app.py` is not running, dangerous commands will be **blocked** (not silently allowed).
+> Always start WinNico first, then start Claude Code.
+
 ```bash
 # 1. Clone this repository
 git clone https://github.com/suzutomo1984/winnico.git
@@ -41,8 +46,11 @@ pip install -r requirements.txt
 # 3. Register Claude Code hooks (run once)
 python setup_hooks.py
 
-# 4. Start WinNico
+# 4. Start WinNico (keep this running in the background)
 python winnico_app.py
+
+# 5. In another terminal, start Claude Code
+claude
 ```
 
 That's it! WinNico will now intercept Claude Code's tool requests.
@@ -128,6 +136,11 @@ Claude Codeが危険なコマンド（`rm`、`git push`、`curl` 等）を実行
 
 ### インストール
 
+> [!WARNING]
+> **WinNicoは必ずClaude Codeより先に起動してください。**
+> `winnico_app.py` が起動していない場合、危険なコマンドは**ブロックされます**（黙って許可はされません）。
+> 必ずWinNicoを先に起動してからClaude Codeを使ってください。
+
 ```bash
 # 1. クローン
 git clone https://github.com/suzutomo1984/winnico.git
@@ -139,8 +152,11 @@ pip install -r requirements.txt
 # 3. Claude Code フックを登録（初回のみ）
 python setup_hooks.py
 
-# 4. WinNico を起動
+# 4. WinNico を起動（バックグラウンドで起動したままにする）
 python winnico_app.py
+
+# 5. 別のターミナルでClaude Codeを起動
+claude
 ```
 
 以降はClaude Codeを使うたびに、WinNicoが承認をインターセプトします。

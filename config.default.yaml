@@ -7,8 +7,11 @@ character_image: "character.png"
 
 # フォーカス対象ウィンドウのタイトルキーワード（部分一致、大文字小文字無視）
 # 複数指定した場合は上から順に探して最初にヒットしたウィンドウをフォーカスする
+# 注意: "Claude" はブラウザで Claude.ai を開いているタブにも一致する場合があります
+# 例: "Cursor", "Visual Studio Code", "Antigravity", "Windows PowerShell"
 target_window_titles:
-  - "Antigravity"
+  - "Claude"
+  - "Terminal"
 
 # チャット入力欄のクリック位置（ウィンドウ下端からの距離 px）
 # エディタによって調整が必要な場合は変更する
