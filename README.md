@@ -94,9 +94,19 @@ use_cursor_pos: false
 
 ## For Claude Code
 
-このリポジトリをClone後、Claude Codeに読ませると対話形式でセットアップを進めることができます。
+> このセクションはClaude Codeが自律的に読み、ユーザーの代わりにセットアップを完了させるための指示書です。
+> ユーザーがこのリポジトリをCloneしてClaude Codeに「セットアップして」と伝えるだけで、以下の手順を自動実行してください。
 
-**Claude Codeへの指示:** 以下の手順でユーザーに一問一答しながらセットアップを進めてください。
+---
+
+### Claude Codeへの指示
+
+あなたはWinNicoのセットアップをユーザーの代わりに完全に完了させてください。  
+ユーザーは待っているだけでよい状態にすることがゴールです。  
+各ステップを順番に実行し、問題があればその場で対処してください。  
+ユーザーへの確認が必要な場面では、必ず**AskUserQuestionツール**を使って一問一答で聞いてください。
+
+---
 
 ### Step 1: Pythonバージョンの確認
 
@@ -104,85 +114,118 @@ use_cursor_pos: false
 python --version
 ```
 
-Python 3.10以上であることを確認する。
+- Python 3.10以上であればOK。そのまま次へ。
+- 3.10未満の場合はユーザーに伝えて中断する。
 
-### Step 2: 依存パッケージの確認・インストール
+---
 
-> **重要:** 仮想環境（venv, conda等）がアクティブな場合は **必ず `deactivate`** してから実行する。  
-> `setup_hooks.py` はシステムのPythonパスを `settings.json` に書き込む。仮想環境のPythonパスが書き込まれると、venv削除後にフックが壊れる。
+### Step 2: 依存パッケージのインストール
+
+まず仮想環境がアクティブかどうか確認する:
 
 ```bash
-pip show PyQt5 pywin32 pyyaml
+python -c "import sys; print('venv' if sys.prefix != getattr(sys, 'base_prefix', sys.prefix) else 'system')"
 ```
 
-未インストールのものがあれば実行する:
+- `venv` と表示された場合 → ユーザーに以下を伝えてから `deactivate` するよう案内する:
+  > 「仮想環境がアクティブです。setup_hooks.py はシステムのPythonパスを設定ファイルに書き込むため、仮想環境内でセットアップすると後でフックが壊れることがあります。一度 `deactivate` してから続けることをお勧めします。このまま続けますか？」
+- `system` と表示された場合 → そのまま次へ。
+
+パッケージをインストールする:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-失敗した場合:
-- PyQt5が失敗する場合: `pip install PyQt5-Qt5 PyQt5-sip PyQt5` を試す
-- pywin32が失敗する場合: [pywin32 Releases](https://github.com/mhammond/pywin32/releases) から手動でインストールする
+失敗した場合は以下を順番に試す:
+1. `pip install PyQt5-Qt5 PyQt5-sip PyQt5` （PyQt5のwheel問題）
+2. `pip install pywin32` （pywin32単体で再試行）
+3. いずれも失敗した場合はエラー内容をユーザーに提示し、[Troubleshooting](#troubleshooting) を参照するよう案内する。
 
-### Step 3: フックの登録
+---
 
-既存の `~/.claude/settings.json` の設定は保持される（バックアップも自動作成される）ことをユーザーに伝えてから実行する。
+### Step 3: Claude Code フックの登録
+
+既存の `~/.claude/settings.json` の設定は**バックアップが自動作成されるので安全**であることをユーザーに伝えてから実行する:
 
 ```bash
 python setup_hooks.py
 ```
 
-### Step 4: config.yaml の作成（必須）
-
-ユーザーに以下を一問一答で確認してから `config.yaml` を作成する：
-
-1. **使用エディタ・ターミナルのタイトルバーに何と表示されているか？**
-   ウィンドウ上部のバーを見て、そこに書いてある文字列をそのまま教えてもらう。  
-   例: `Antigravity` / `Cursor` / `Visual Studio Code` / `Windows PowerShell` など  
-   → その文字列を `target_window_titles` に設定する  
-   ⚠️ `"Claude"` は避ける（ブラウザでClaude.aiを開いているタブにも一致するため）
-
-2. **キャラクター画像はどうする？**
-   - デフォルト（付属の `character.png`）をそのまま使う → 設定変更不要
-   - 好きな画像に差し替えたい → PNG推奨・透過対応。画像ファイルのパスを `character_image` に設定する
-
-3. **フォーカス方式は？**（Cursor/VSCodeを使っている場合は必ず確認）
-   - `use_cursor_pos: false`（デフォルト・カーソルが動かない）
-   - `use_cursor_pos: true`（Cursor/VSCodeなどElectron系でフォーカスが効かない場合）
-
-4. **チャット入力欄の位置はデフォルト（60px）でよいか？**
-   ずれる場合は `chat_input_offset_from_bottom` を調整する。
-
-### Step 5: 起動と動作確認
-
-**必ずWinNicoを先に起動してから、Claude Codeを起動すること。順番が逆になるとコマンドがブロックされる。**
+完了したら `~/.claude/settings.json` に `PreToolUse` と `Stop` の両方にWinNicoのエントリが追加されたことを確認する:
 
 ```bash
-# ターミナル1: WinNicoを起動したままにする
-python winnico_app.py
+python -c "import json,pathlib; s=json.loads(pathlib.Path.home().joinpath('.claude','settings.json').read_text(encoding='utf-8')); [print(k, len(v), 'entries') for k,v in s.get('hooks',{}).items()]"
 ```
 
-起動時に `[WinNico self-check] ✅ 環境チェック OK` が表示されることを確認する。  
-❌ や ⚠️ が出た場合はメッセージに従って問題を解決してから進む。
+---
 
+### Step 4: config.yaml の作成
+
+`config.default.yaml` を元に `config.yaml` を作成する。以下をユーザーに**一問ずつ**確認してから作成する:
+
+**質問1: 使用しているエディタ・ターミナルは何ですか？**
+
+ウィンドウ上部のタイトルバーに表示されている文字列をそのまま教えてもらう。  
+例: `Antigravity` / `Cursor` / `Visual Studio Code` / `Windows Terminal` など  
+→ `target_window_titles` に設定する。  
+⚠️ `"Claude"` という文字列は避ける（ブラウザでClaude.aiを開いているタブにも一致するため）。
+
+**質問2: キャラクター画像はどうしますか？**
+
+- 付属の `character.png` をそのまま使う → `character_image: "character.png"` のまま
+- 自分の画像を使いたい → PNG推奨・透過対応。ファイルのパスを教えてもらい `character_image` に設定する
+
+**質問3: Cursor または VSCode を使っていますか？**
+
+- Yes → `use_cursor_pos: true` に設定する（Electron系エディタはSendMessage方式が効かないため）
+- No → `use_cursor_pos: false`（デフォルト）のまま
+
+回答をもとに `config.yaml` を作成する（`config.default.yaml` をベースに変更箇所のみ上書き）。
+
+---
+
+### Step 5: WinNicoの起動案内
+
+ここからはユーザーに操作を案内する。以下をユーザーに伝える:
+
+---
+
+**セットアップが完了しました！あとは2つのターミナルを開いて以下を実行するだけです。**
+
+**ターミナル1（WinNicoを起動・起動したままにしておく）:**
 ```bash
-# ターミナル2: Claude Codeをbypassモードで起動（必須）
+python winnico_app.py
+```
+起動すると `[WinNico self-check] ✅ 環境チェック OK` と表示されます。  
+画面下部中央にキャラクターが表示されたら成功です。
+
+**ターミナル2（Claude Codeをbypassモードで起動）:**
+```bash
 claude --permission-mode bypassPermissions
 ```
 
-**`--permission-mode bypassPermissions` を忘れると、Claude Code自身の承認UIが表示されWinNicoは機能しない。**
+> **`--permission-mode bypassPermissions` について:**  
+> このフラグはClaude Code自身の承認UIを無効化し、すべての承認判断をWinNicoに委譲するモードです。  
+> このフラグなしで起動すると、Claude Code自身のUIが先に表示されてWinNicoが機能しません。  
+> WinNicoを使う場合は**必ずこのフラグ付きで起動**してください。
+
+> **起動順序について:**  
+> WinNicoを**必ずClaude Codeより先に**起動してください。  
+> WinNicoが起動していない状態でClaude Codeが危険なコマンドを実行しようとすると、コマンドは自動的にブロックされます（黙って実行されることはありません）。
+
+---
 
 ### Step 6: 動作確認
 
-Claude Codeのチャットで以下を実行し、WinNicoが反応することを確認する：
+WinNicoとClaude Codeの両方が起動したら、Claude Codeのチャットで以下を試してもらうよう案内する:
 
 ```
 curl --version を実行してみてください
 ```
 
-WinNicoのキャラクターが承認ダイアログを表示したらセットアップ完了。  
-反応しない場合は下記 Troubleshooting を参照。
+WinNicoのキャラクターが承認ダイアログを表示し、通知音が鳴ればセットアップ完了です。  
+反応しない場合は [Troubleshooting](#troubleshooting) を参照してください。
 
 ---
 
