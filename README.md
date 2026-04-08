@@ -101,33 +101,63 @@ use_cursor_pos: false
 
 ---
 
-### Step 0: Python のインストール確認
+### Step 0: 環境スキャン
+
+まず以下のコマンドを一括実行して現在の環境状態をスキャンする:
 
 ```bash
-python --version
+python -c "
+import sys, importlib.util, subprocess
+
+results = []
+
+# Pythonバージョン
+ver = sys.version_info
+results.append(f'Python: {sys.version.split()[0]} ({\"OK\" if ver >= (3,10) else \"NG: 3.10以上が必要\"})')
+
+# 仮想環境
+in_venv = sys.prefix != getattr(sys, 'base_prefix', sys.prefix)
+results.append(f'venv: {\"アクティブ (注意)\" if in_venv else \"なし (OK)\"}')
+
+# パッケージ確認
+for pkg, import_name in [('PyQt5','PyQt5'), ('pywin32','win32gui'), ('pyyaml','yaml')]:
+    found = importlib.util.find_spec(import_name) is not None
+    results.append(f'{pkg}: {\"インストール済み\" if found else \"未インストール\"}')
+
+for r in results:
+    print(r)
+"
 ```
 
-- **Python 3.10以上が表示された** → Step 1へ進む。
-- **`python` コマンドが見つからない / 3.10未満** → ユーザーに以下を伝える:
+スキャン結果を確認して以下のように対処する:
 
-  > 「Pythonが見つかりません（またはバージョンが古いです）。  
-  > https://www.python.org/downloads/ からPython 3.11以上をインストールしてください。  
-  > インストール時に **"Add Python to PATH"** にチェックを入れるのを忘れずに。  
-  > インストールが完了したら、このターミナルを閉じて新しいターミナルを開き、もう一度「セットアップして」と伝えてください。」
+**Python が `NG` の場合（3.10未満 または コマンドが見つからない）:**
+> 「Pythonが見つかりません（またはバージョンが古いです）。  
+> https://www.python.org/downloads/ からPython 3.11以上をインストールしてください。  
+> インストール時に **"Add Python to PATH"** にチェックを入れるのを忘れずに。  
+> インストールが完了したら、このターミナルを閉じて新しいターミナルを開き、もう一度「セットアップして」と伝えてください。」  
+> → インストールが完了するまでここで停止する。
 
-  インストールが完了するまでここで停止する。
+**venv が `アクティブ` の場合:**  
+AskUserQuestionでユーザーに確認する:
+> 「仮想環境がアクティブです。setup_hooks.py はシステムのPythonパスを設定ファイルに書き込むため、venv内でセットアップすると後でvenvを削除した時にフックが壊れます。`deactivate` してから続けることをお勧めします。このまま続けますか？」
+
+**パッケージが `未インストール` の場合:**  
+Step 2でまとめてインストールする（スキャン結果を記録しておく）。
+
+全ての項目がOKであればスキャン結果をユーザーに提示してから次へ進む。
 
 ---
 
-### Step 1: 仮想環境の確認
+### Step 1: （スキップ可）仮想環境の deactivate
+
+Step 0で仮想環境がアクティブかつユーザーが `deactivate` を選んだ場合のみ実行:
 
 ```bash
-python -c "import sys; print('venv' if sys.prefix != getattr(sys, 'base_prefix', sys.prefix) else 'system')"
+deactivate
 ```
 
-- `venv` と表示された場合 → AskUserQuestionでユーザーに確認する:
-  > 「仮想環境がアクティブな状態です。setup_hooks.py はシステムのPythonパスを設定ファイルに書き込むため、仮想環境内でセットアップすると後でvenvを削除した時にフックが壊れることがあります。`deactivate` してシステムPythonで続けることをお勧めしますが、このまま続けますか？」
-- `system` と表示された場合 → そのまま次へ。
+実行後、Step 0のスキャンコマンドを再実行して `venv: なし (OK)` になったことを確認する。
 
 ---
 
