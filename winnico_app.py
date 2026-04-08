@@ -12,6 +12,7 @@ import json
 import time
 import math
 import traceback
+import winsound
 from pathlib import Path
 try:
     import win32gui
@@ -82,6 +83,19 @@ _auto_allow_keywords: set = set()
 
 bridge = SignalBridge()
 
+
+def _play_sound(sound_type: str) -> None:
+    """Windowsシステムサウンドを非同期で鳴らす"""
+    def _play():
+        try:
+            if sound_type == "alert":
+                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            elif sound_type == "complete":
+                winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        except Exception:
+            pass
+    threading.Thread(target=_play, daemon=True).start()
+
 # ============================================================
 # メインキャラクターウィンドウ
 # ============================================================
@@ -151,17 +165,21 @@ class NicoWindow(QWidget):
         y = screen.height() - 380 - 10  # タスクバー上から10px
         self.move(x, y)
 
-        # ボタンを最上部に配置（3ボタン構成）
+        # ボタンを最上部に配置（3ボタン構成 + 閉じる + キャンセル）
         self.approve_btn     = QPushButton("✅ 許可", self)
         self.approve_all_btn = QPushButton("✅✅ 以降も許可", self)
         self.deny_btn        = QPushButton("❌ 拒否", self)
+        self.close_btn       = QPushButton("✕ 閉じる", self)
+        self.cancel_btn      = QPushButton("🛑 処理を止める", self)
         self.approve_btn.setGeometry(15,  8,  78, 34)
         self.approve_all_btn.setGeometry(97,  8,  90, 34)
         self.deny_btn.setGeometry(191,  8,  74, 34)
+        self.close_btn.setGeometry(15,  8, 250, 34)
+        self.cancel_btn.setGeometry(15, 46, 250, 30)
 
         # テキストエリアはボタンの下
         self.text_area = QTextEdit(self)
-        self.text_area.setGeometry(12, 50, 256, 190)
+        self.text_area.setGeometry(12, 84, 256, 156)
         self.text_area.setReadOnly(True)
         self.text_area.setFont(QFont("Meiryo", 9))
         self.text_area.setStyleSheet("""
@@ -187,6 +205,8 @@ class NicoWindow(QWidget):
             (self.approve_btn,     "#4CAF50", "#45a049"),
             (self.approve_all_btn, "#2196F3", "#1976D2"),
             (self.deny_btn,        "#f44336", "#da190b"),
+            (self.close_btn,       "#888888", "#666666"),
+            (self.cancel_btn,      "#b71c1c", "#7f0000"),
         ]:
             btn.setStyleSheet(f"""
                 QPushButton {{
@@ -200,6 +220,8 @@ class NicoWindow(QWidget):
         self.approve_btn.clicked.connect(lambda: self._respond(True, bulk=False))
         self.approve_all_btn.clicked.connect(lambda: self._respond(True, bulk=True))
         self.deny_btn.clicked.connect(lambda: self._respond(False, bulk=False))
+        self.close_btn.clicked.connect(self._back_to_idle)
+        self.cancel_btn.clicked.connect(self._cancel_processing)
 
     def _setup_tray(self):
         pix = QPixmap(32, 32)
@@ -457,9 +479,12 @@ class NicoWindow(QWidget):
         self._response_event  = threading.Event()
         self._response_result = None
 
+        _play_sound("alert")
+
         self.approve_btn.show()
         self.approve_all_btn.show()
         self.deny_btn.show()
+        self.cancel_btn.show()
         self.raise_()
 
         self._tray.showMessage(
@@ -472,10 +497,12 @@ class NicoWindow(QWidget):
     def _on_notification(self, message):
         self.text_area.setPlainText(message)
         self.text_area.show()
+        self.close_btn.show()
         self.speech_text = ""
         self.state       = self.HAPPY
         self.alert_shake = 10
-        QTimer.singleShot(4000, self._back_to_idle)
+        _play_sound("complete")
+        QTimer.singleShot(7000, self._back_to_idle)
 
     def _respond(self, approved: bool, bulk: bool = False):
         # まとめて許可の場合、このキーワード種別をセッション中auto-allowに登録
@@ -489,6 +516,7 @@ class NicoWindow(QWidget):
         self.approve_btn.hide()
         self.approve_all_btn.hide()
         self.deny_btn.hide()
+        self.cancel_btn.hide()
         self.text_area.hide()
         self.text_area.setPlainText(msg)
         self.text_area.show()
@@ -497,10 +525,27 @@ class NicoWindow(QWidget):
         if self._response_event:
             self._response_event.set()
 
+    def _cancel_processing(self):
+        """処理を止める（ESC相当）— 承認待ちをblockで返す"""
+        self._response_result = False
+        self.approve_btn.hide()
+        self.approve_all_btn.hide()
+        self.deny_btn.hide()
+        self.cancel_btn.hide()
+        self.text_area.hide()
+        self.text_area.setPlainText("🛑 処理を止めたよ")
+        self.text_area.show()
+        self.state = self.IDLE
+        QTimer.singleShot(2000, self._back_to_idle)
+        if self._response_event:
+            self._response_event.set()
+
     def _back_to_idle(self):
         self.state       = self.IDLE
         self.speech_text = ""
         self.text_area.hide()
+        self.close_btn.hide()
+        self.cancel_btn.hide()
 
     # ----------------------------------------------------------
     # ドラッグ＆クリック

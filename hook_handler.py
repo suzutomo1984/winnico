@@ -49,6 +49,12 @@ DANGEROUS_BASH_KEYWORDS = {
 NOTIFY_ONLY_TOOLS = {
     "WebSearch",
     "WebFetch",
+    "Read",
+    "Glob",
+    "Grep",
+    "Edit",
+    "Write",
+    "AskUserQuestion",
 }
 
 
@@ -257,15 +263,63 @@ def _explain_command(cmd: str) -> str:
     return "コマンドを実行する"
 
 
+def _short_path(path: str) -> str:
+    """パスから 'フォルダ名/ファイル名' 形式で返す"""
+    parts = path.replace("\\", "/").split("/")
+    if len(parts) >= 2:
+        return f"{parts[-2]}/{parts[-1]}"
+    return parts[-1]
+
+
 def _build_notify_message(tool_name: str, tool_input: dict) -> str:
     """通知用メッセージを構築"""
     if tool_name == "WebSearch":
         q = tool_input.get("query", "")
-        return f"🔍 検索中\n{q[:50]}"
+        return f"🔍 検索中...\n「{q[:60]}」"
     if tool_name == "WebFetch":
         url = tool_input.get("url", "")
-        return f"🌐 取得中\n{url[:50]}"
-    return f"⚙️ {tool_name} 実行中"
+        domain = url.split("/")[2] if url.startswith("http") else url
+        return f"🌐 サイト取得中...\n{domain[:60]}"
+    if tool_name == "Read":
+        path = tool_input.get("file_path", "")
+        return f"📖 ファイル読み込み中...\n{_short_path(path)}"
+    if tool_name == "Glob":
+        pattern = tool_input.get("pattern", "")
+        return f"🗂 ファイル検索中...\n{pattern[:60]}"
+    if tool_name == "Grep":
+        pattern = tool_input.get("pattern", "")
+        return f"🔎 コード検索中...\n「{pattern[:60]}」"
+    if tool_name == "Edit":
+        path = tool_input.get("file_path", "")
+        old = tool_input.get("old_string", "").strip().splitlines()
+        new = tool_input.get("new_string", "").strip().splitlines()
+        def _preview(lines, prefix, max_lines=3):
+            if not lines:
+                return ""
+            shown = [f"{prefix} {l[:60]}" for l in lines[:max_lines]]
+            if len(lines) > max_lines:
+                shown.append(f"{prefix} ... (+{len(lines)-max_lines}行)")
+            return "\n".join(shown)
+        old_text = _preview(old, "[-]")
+        new_text = _preview(new, "[+]")
+        diff = ""
+        if old_text:
+            diff += f"\n{old_text}"
+        if new_text:
+            diff += f"\n{new_text}"
+        return f"✏️ {_short_path(path)} を編集中...{diff}"
+    if tool_name == "Write":
+        path = tool_input.get("file_path", "")
+        content = tool_input.get("content", "").strip().splitlines()
+        preview = content[0][:50] if content else ""
+        return f"📝 {_short_path(path)} を作成中...\n{preview}" if preview else f"📝 {_short_path(path)} を作成中..."
+    if tool_name == "AskUserQuestion":
+        questions = tool_input.get("questions", [])
+        if questions:
+            q_text = questions[0].get("question", "")[:60]
+            return f"💬 質問が来てるよ！\nチャットを見て！\n\n「{q_text}」"
+        return "💬 質問が来てるよ！\nチャットを見て！"
+    return f"⚙️ {tool_name} 実行中..."
 
 
 if __name__ == "__main__":
