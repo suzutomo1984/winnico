@@ -41,7 +41,26 @@ def get_stop_handler_path() -> Path:
     return (Path(__file__).parent / "stop_handler.py").resolve()
 
 
+def _is_winnico_entry(entry: dict) -> bool:
+    """エントリが WinNico のフックかどうかを判定する"""
+    needles = ("winnico", "hook_handler", "stop_handler")
+    return any(
+        any(n in h.get("command", "").lower() for n in needles)
+        for h in entry.get("hooks", [])
+    )
+
+
 def setup():
+    # 仮想環境チェック
+    if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
+        print("[警告] 仮想環境がアクティブです。")
+        print(f"  仮想環境Python: {sys.executable}")
+        print("  このまま登録すると、仮想環境を削除した時にフックが壊れます。")
+        ans = input("  このまま続けますか？ [y/N]: ").strip().lower()
+        if ans != "y":
+            print("中断しました。仮想環境を deactivate してから再実行してください。")
+            sys.exit(0)
+
     settings_path = get_claude_settings_path()
     hook_script   = get_hook_handler_path()
     stop_script   = get_stop_handler_path()
@@ -84,11 +103,7 @@ def setup():
         hooks["PreToolUse"] = []
 
     # 既存の WinNico エントリを削除（重複防止）
-    hooks["PreToolUse"] = [
-        h for h in hooks["PreToolUse"]
-        if "winnico" not in h.get("hooks", [{}])[0].get("command", "").lower()
-        and "hook_handler" not in h.get("hooks", [{}])[0].get("command", "").lower()
-    ]
+    hooks["PreToolUse"] = [h for h in hooks["PreToolUse"] if not _is_winnico_entry(h)]
 
     # WinNico フックを追加
     winnico_hook = {
@@ -107,10 +122,7 @@ def setup():
         hooks["Stop"] = []
 
     # 既存のWinNico Stopフックを削除（重複防止）
-    hooks["Stop"] = [
-        h for h in hooks["Stop"]
-        if "stop_handler" not in h.get("hooks", [{}])[0].get("command", "").lower()
-    ]
+    hooks["Stop"] = [h for h in hooks["Stop"] if not _is_winnico_entry(h)]
 
     stop_hook = {
         "hooks": [
@@ -141,20 +153,20 @@ def remove():
         print("settings.json が見つかりません。")
         return
 
-    with open(settings_path, "r", encoding="utf-8") as f:
-        settings = json.load(f)
+    try:
+        with open(settings_path, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"settings.json のJSONが壊れています: {e}")
+        return
 
-    hooks = settings.get("hooks", {})
-    pre = hooks.get("PreToolUse", [])
-    filtered = [
-        h for h in pre
-        if "hook_handler" not in h.get("hooks", [{}])[0].get("command", "").lower()
-    ]
-    hooks["PreToolUse"] = filtered
+    hooks = settings.setdefault("hooks", {})
+    hooks["PreToolUse"] = [h for h in hooks.get("PreToolUse", []) if not _is_winnico_entry(h)]
+    hooks["Stop"]       = [h for h in hooks.get("Stop", [])       if not _is_winnico_entry(h)]
 
     _write_json_atomic(settings_path, settings)
 
-    print("✅ WinNico フックを削除しました。")
+    print("✅ WinNico の PreToolUse / Stop フックを削除しました。")
 
 
 if __name__ == "__main__":

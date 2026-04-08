@@ -98,51 +98,106 @@ use_cursor_pos: false
 
 **Claude Codeへの指示:** 以下の手順でユーザーに一問一答しながらセットアップを進めてください。
 
-### Step 1: 依存パッケージの確認・インストール
+### Step 1: Pythonバージョンの確認
+
+```bash
+python --version
+```
+
+Python 3.10以上であることを確認する。
+
+### Step 2: 依存パッケージの確認・インストール
+
+> **重要:** 仮想環境（venv, conda等）がアクティブな場合は **必ず `deactivate`** してから実行する。  
+> `setup_hooks.py` はシステムのPythonパスを `settings.json` に書き込む。仮想環境のPythonパスが書き込まれると、venv削除後にフックが壊れる。
 
 ```bash
 pip show PyQt5 pywin32 pyyaml
 ```
 
-未インストールのものがあれば `pip install -r requirements.txt` を実行する。
+未インストールのものがあれば実行する:
 
-### Step 2: フックの登録
+```bash
+pip install -r requirements.txt
+```
 
-既存の `~/.claude/settings.json` の設定は保持されることをユーザーに伝えてから実行する。
+失敗した場合:
+- PyQt5が失敗する場合: `pip install PyQt5-Qt5 PyQt5-sip PyQt5` を試す
+- pywin32が失敗する場合: [pywin32 Releases](https://github.com/mhammond/pywin32/releases) から手動でインストールする
+
+### Step 3: フックの登録
+
+既存の `~/.claude/settings.json` の設定は保持される（バックアップも自動作成される）ことをユーザーに伝えてから実行する。
 
 ```bash
 python setup_hooks.py
 ```
 
-### Step 3: config.yaml の作成（必須）
+### Step 4: config.yaml の作成（必須）
 
 ユーザーに以下を一問一答で確認してから `config.yaml` を作成する：
 
-1. **使用エディタ・ターミナルは？**
-   例: Antigravity / Cursor / Visual Studio Code / Windows Terminal など
-   → タイトルバーに表示される文字列を `target_window_titles` に設定する
+1. **使用エディタ・ターミナルのタイトルバーに何と表示されているか？**
+   ウィンドウ上部のバーを見て、そこに書いてある文字列をそのまま教えてもらう。  
+   例: `Antigravity` / `Cursor` / `Visual Studio Code` / `Windows PowerShell` など  
+   → その文字列を `target_window_titles` に設定する  
+   ⚠️ `"Claude"` は避ける（ブラウザでClaude.aiを開いているタブにも一致するため）
 
 2. **キャラクター画像はどうする？**
-   `character.png` はリポジトリに付属しているのでcloneすればそのまま使える。
    - デフォルト（付属の `character.png`）をそのまま使う → 設定変更不要
    - 好きな画像に差し替えたい → PNG推奨・透過対応。画像ファイルのパスを `character_image` に設定する
 
-3. **フォーカス方式は？**
+3. **フォーカス方式は？**（Cursor/VSCodeを使っている場合は必ず確認）
    - `use_cursor_pos: false`（デフォルト・カーソルが動かない）
    - `use_cursor_pos: true`（Cursor/VSCodeなどElectron系でフォーカスが効かない場合）
 
 4. **チャット入力欄の位置はデフォルト（60px）でよいか？**
    ずれる場合は `chat_input_offset_from_bottom` を調整する。
 
-### Step 4: 起動案内
+### Step 5: 起動と動作確認
+
+**必ずWinNicoを先に起動してから、Claude Codeを起動すること。順番が逆になるとコマンドがブロックされる。**
 
 ```bash
 # ターミナル1: WinNicoを起動したままにする
 python winnico_app.py
+```
 
+起動時に `[WinNico self-check] ✅ 環境チェック OK` が表示されることを確認する。  
+❌ や ⚠️ が出た場合はメッセージに従って問題を解決してから進む。
+
+```bash
 # ターミナル2: Claude Codeをbypassモードで起動（必須）
 claude --permission-mode bypassPermissions
 ```
+
+**`--permission-mode bypassPermissions` を忘れると、Claude Code自身の承認UIが表示されWinNicoは機能しない。**
+
+### Step 6: 動作確認
+
+Claude Codeのチャットで以下を実行し、WinNicoが反応することを確認する：
+
+```
+curl --version を実行してみてください
+```
+
+WinNicoのキャラクターが承認ダイアログを表示したらセットアップ完了。  
+反応しない場合は下記 Troubleshooting を参照。
+
+---
+
+## Troubleshooting
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `pip install PyQt5` が失敗する | Python 3.13以降でwheelが提供されていない場合がある | `pip install PyQt5-Qt5 PyQt5-sip PyQt5` を試す |
+| `pywin32` をインストールできない | Windows環境依存 | [pywin32 Releases](https://github.com/mhammond/pywin32/releases) から手動インストール |
+| キャラクターが全く反応しない | `bypassPermissions` フラグ忘れ | `claude --permission-mode bypassPermissions` で起動しているか確認 |
+| 「WinNicoが起動していません」でブロックされる | WinNicoが未起動 | `python winnico_app.py` を先に起動してから `claude` を起動する |
+| ポート19234エラーで起動できない | 別プロセスがポートを使用中 | `netstat -ano \| findstr 19234` で確認し、該当プロセスを終了する |
+| フックを登録したのにキャラクターが反応しない | venv内でセットアップし、venvのPythonパスが書き込まれた | `python setup_hooks.py --remove` → venvを `deactivate` → `python setup_hooks.py` を再実行 |
+| キャラクターをクリックしてもウィンドウがフォーカスされない | Electron系エディタではSendMessage方式が効かない | `config.yaml` で `use_cursor_pos: true` に変更 |
+| `self-check` で `pywin32` エラーが出る | pywin32が正しくインストールされていない | `pip install pywin32` を実行後、Pythonを再起動する |
 
 ---
 

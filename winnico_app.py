@@ -84,6 +84,59 @@ _auto_allow_keywords: set = set()
 bridge = SignalBridge()
 
 
+def self_check() -> tuple:
+    """起動時環境チェック。issues は致命的エラー、warnings は警告のみ。"""
+    issues = []
+    warnings = []
+
+    # Pythonバージョンチェック
+    if sys.version_info < (3, 10):
+        issues.append(f"Python 3.10以上が必要です（現在: {sys.version.split()[0]}）")
+
+    # pywin32チェック
+    if not HAS_WIN32:
+        issues.append(
+            "pywin32 が import できません。キャラクタークリックのフォーカス機能が動きません。\n"
+            "  同じPythonで `pip install pywin32` を実行してください。"
+        )
+
+    # PyYAMLチェック
+    if not HAS_YAML:
+        warnings.append("PyYAML がインストールされていません。config.yaml が読み込めません。")
+
+    # ポート使用可否チェック（バインドテスト）
+    test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    test_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        test_sock.bind(("127.0.0.1", SOCKET_PORT))
+    except OSError as e:
+        issues.append(f"ポート {SOCKET_PORT} が使用中です: {e}\n"
+                      "  別の WinNico が起動中か、他のプロセスが使用しています。")
+    finally:
+        test_sock.close()
+
+    # Claude settings.json とフック登録確認
+    settings_path = Path.home() / ".claude" / "settings.json"
+    if not settings_path.exists():
+        warnings.append(f"{settings_path} が見つかりません。setup_hooks.py を実行してください。")
+    else:
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            hooks = settings.get("hooks", {})
+            pre_hooks  = hooks.get("PreToolUse", [])
+            stop_hooks = hooks.get("Stop", [])
+            if not any("hook_handler" in h.get("command", "").lower()
+                       for entry in pre_hooks for h in entry.get("hooks", [])):
+                warnings.append("PreToolUse フックが未登録です。setup_hooks.py を実行してください。")
+            if not any("stop_handler" in h.get("command", "").lower()
+                       for entry in stop_hooks for h in entry.get("hooks", [])):
+                warnings.append("Stop フックが未登録です。setup_hooks.py を実行してください。")
+        except json.JSONDecodeError as e:
+            warnings.append(f"settings.json のJSONが壊れています: {e}")
+
+    return issues, warnings
+
+
 def _play_sound(sound_type: str) -> None:
     """Windowsシステムサウンドを非同期で鳴らす"""
     def _play():
@@ -125,6 +178,7 @@ class NicoWindow(QWidget):
         self._response_result = None
         self._drag_offset     = QPoint()
         self._current_danger_kw: str = ""  # 現在の承認リクエストのキーワード種別
+        self._approval_lock   = threading.Lock()  # 承認リクエストの直列化
 
         # キャラ画像ロード（透過PNG対応・config.yamlで差し替え可能）
         img_setting = CONFIG.get("character_image", "character.png")
@@ -669,22 +723,24 @@ def _handle_connection(conn, nico):
             conn.sendall(b'{"status":"ok"}\n')
             return
 
-        bridge.approval_requested.emit(request)
+        # 承認リクエストは1度に1つだけ処理する（ロックで直列化）
+        with nico._approval_lock:
+            bridge.approval_requested.emit(request)
 
-        # 応答待ち（最大 120 秒）
-        for _ in range(240):
-            if nico._response_event and nico._response_event.is_set():
-                break
-            time.sleep(0.5)
+            # 応答待ち（最大 120 秒）
+            for _ in range(240):
+                if nico._response_event and nico._response_event.is_set():
+                    break
+                time.sleep(0.5)
 
-        approved = nico._response_result if nico._response_result is not None else False
-        nico._response_event  = None
-        nico._response_result = None
+            approved = nico._response_result if nico._response_result is not None else False
+            nico._response_event  = None
+            nico._response_result = None
 
         if approved:
             resp = {"behavior": "allow"}
         else:
-            resp = {"behavior": "block", "reason": "ユーザーが WinClaude で拒否しました"}
+            resp = {"behavior": "block", "reason": "ユーザーが WinNico で拒否しました"}
 
         conn.sendall((json.dumps(resp, ensure_ascii=False) + "\n").encode())
 
@@ -709,20 +765,31 @@ def main():
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
 
+    # 起動時セルフチェック
+    issues, warnings = self_check()
+    for w in warnings:
+        print(f"[WinNico self-check] ⚠️  {w}")
+    if issues:
+        for i in issues:
+            print(f"[WinNico self-check] ❌ {i}")
+        print("\n起動を中止しました。上記の問題を解決してから再実行してください。")
+        sys.exit(1)
+    print("[WinNico self-check] ✅ 環境チェック OK")
+
     nico = NicoWindow()
     nico.show()
 
     try:
         srv = _create_socket_server()
     except OSError as e:
-        print(f"[WinClaude] 致命的エラー: ポート {SOCKET_PORT} をバインドできません: {e}")
+        print(f"[WinNico] 致命的エラー: ポート {SOCKET_PORT} をバインドできません: {e}")
         print("別のWinNicoが起動中か、ポートが使用中の可能性があります。")
         sys.exit(1)
 
     t = threading.Thread(target=run_socket_server, args=(srv, nico), daemon=True)
     t.start()
 
-    print("[WinClaude] 起動しました。Claude Code の承認を待機中...")
+    print("[WinNico] 起動しました。Claude Code の承認を待機中...")
     sys.exit(app.exec_())
 
 
