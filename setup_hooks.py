@@ -51,15 +51,20 @@ def _is_winnico_entry(entry: dict) -> bool:
 
 
 def setup():
+    force = "--force" in sys.argv
+
     # 仮想環境チェック
     if sys.prefix != getattr(sys, "base_prefix", sys.prefix):
         print("[警告] 仮想環境がアクティブです。")
         print(f"  仮想環境Python: {sys.executable}")
         print("  このまま登録すると、仮想環境を削除した時にフックが壊れます。")
-        ans = input("  このまま続けますか？ [y/N]: ").strip().lower()
-        if ans != "y":
-            print("中断しました。仮想環境を deactivate してから再実行してください。")
+        if not force:
+            print("  続行する場合は --force オプションを付けて再実行してください。")
+            print("  例: python setup_hooks.py --force")
+            print("中断しました。")
             sys.exit(0)
+        else:
+            print("  [--force] 仮想環境のまま続行します。")
 
     settings_path = get_claude_settings_path()
     hook_script   = get_hook_handler_path()

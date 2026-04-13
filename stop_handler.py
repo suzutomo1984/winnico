@@ -12,6 +12,7 @@ SOCKET_PORT = 19234
 
 
 def main():
+    sys.stdin.reconfigure(encoding="utf-8", errors="replace")
     raw_input = sys.stdin.read()
 
     try:

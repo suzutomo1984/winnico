@@ -10,7 +10,6 @@ character_image: "character.png"
 # 注意: "Claude" はブラウザで Claude.ai を開いているタブにも一致する場合があります
 # 例: "Cursor", "Visual Studio Code", "Antigravity", "Windows PowerShell"
 target_window_titles:
-  - "Claude"
   - "Terminal"
 
 # チャット入力欄のクリック位置（ウィンドウ下端からの距離 px）
